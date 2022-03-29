@@ -18,6 +18,10 @@ on:
     branches:
       - main
   workflow_dispatch:
+  
+permissions:
+      id-token: write
+      contents: read
 
 jobs:
   build:
@@ -51,10 +55,23 @@ jobs:
             !venv/
             
             
-      - name: 'Login via Azure CLI'
+#       - name: 'Login via Azure CLI'
+#         uses: azure/login@v1
+#         with:
+#           creds: ${{ secrets.AZURE_RBAC_CREDENTIALS }}
+
+      - name: 'Az CLI login'
         uses: azure/login@v1
         with:
-          creds: ${{ secrets.AZURE_RBAC_CREDENTIALS }}
+          client-id: "dc891217-e2e8-49f7-ac09-1158a9520ace"
+          tenant-id: "83370987-42ca-46b6-88bd-671273dca361"
+          subscription-id: "0b98d395-76e0-4bf0-a5fb-2529850f846c"
+  
+      - name: 'Run az commands'
+        run: |
+          az account show
+          az group list
+          pwd 
 
       - name: 'Run Azure Functions Action'
         uses: Azure/functions-action@v1
