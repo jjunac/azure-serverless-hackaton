@@ -1,6 +1,7 @@
 import logging
 import time
 import uuid
+import requests
 from typing import Optional
 import azure.functions as func
 import azure.cosmos.cosmos_client as cosmos_client
@@ -23,8 +24,20 @@ rating_container = db_client.create_database_if_not_exists(id=DB_DATABASE_ID).cr
 
 app = FastAPI()
 
+
 def main(req: func.HttpRequest, context: func.Context) -> func.HttpResponse:
     return func.AsgiMiddleware(app).handle(req, context)
+
+
+def user_exists(userId: str) -> bool:
+    res = requests.get('https://serverlessohapi.azurewebsites.net/api/GetUser', params={"userId": userId})
+    return res.status_code == 200
+
+
+def product_exists(productId: str) -> bool:
+    res = requests.get('https://serverlessohapi.azurewebsites.net/api/GetProduct', params={"productId": productId})
+    return res.status_code == 200
+
 
 class Rating(BaseModel):
     userId: str
@@ -33,10 +46,13 @@ class Rating(BaseModel):
     rating: int
     userNotes: str
 
+
 @app.post("/CreateRating")
 def post_rating(rating: Rating):
     if not (0 <= rating.rating and rating.rating <= 5):
-        return JSONResponse(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, content={"error": f"rating is '{rating.rating}', which is not between 0 and 5"})
+        return JSONResponse(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, content={"error": f"Parameter 'rating is '{rating.rating}', which is not between 0 and 5"})
+    if not user_exists(rating.userId) or not product_exists(rating.productId):
+        return JSONResponse(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, content={"error": f"Parameter 'userId' or 'productId' doesn't exists"})
     inserted_rating = rating_container.create_item(body={
         "id": str(uuid.uuid4()),
         "timestamp": int(time.time()),
@@ -62,6 +78,8 @@ def get_rating_by_id(ratingId: Optional[str] = None):
 def get_ratings_by_user(userId: Optional[str] = None):
     if not userId:
         return JSONResponse(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, content={"error": "Missing mandatory parameter 'userId'"})
+    if not user_exists(userId):
+        return JSONResponse(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, content={"error": f"Parameter 'userId' doesn't exists"})
     rating_list = list(rating_container.query_items(
         query="SELECT * FROM rating WHERE rating.userId=@userId",
         parameters=[
