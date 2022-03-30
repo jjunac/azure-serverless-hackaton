@@ -60,6 +60,8 @@ def get_rating_by_id(ratingId: Optional[str] = None):
 @app.get("/GetRatings")
 @app.get("/GetRatings/{userId}")
 def get_ratings_by_user(userId: Optional[str] = None):
+    if not userId:
+        return JSONResponse(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, content={"error": "Missing mandatory parameter 'userId'"})
     rating_list = list(rating_container.query_items(
         query="SELECT * FROM rating WHERE rating.userId=@userId",
         parameters=[
