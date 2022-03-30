@@ -35,6 +35,8 @@ class Rating(BaseModel):
 
 @app.post("/CreateRating")
 def post_rating(rating: Rating):
+    if not (0 <= rating.rating and rating.rating <= 5):
+        return JSONResponse(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, content={"error": f"rating is '{rating.rating}', which is not between 0 and 5"})
     inserted_rating = rating_container.create_item(body={
         "id": str(uuid.uuid4()),
         "timestamp": int(time.time()),
