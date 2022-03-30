@@ -31,11 +31,13 @@ def main(req: func.HttpRequest, context: func.Context) -> func.HttpResponse:
 
 def user_exists(userId: str) -> bool:
     res = requests.get('https://serverlessohapi.azurewebsites.net/api/GetUser', params={"userId": userId})
+    print(res)
     return res.status_code == 200
 
 
 def product_exists(productId: str) -> bool:
     res = requests.get('https://serverlessohapi.azurewebsites.net/api/GetProduct', params={"productId": productId})
+    print(res)
     return res.status_code == 200
 
 
@@ -49,6 +51,7 @@ class Rating(BaseModel):
 
 @app.post("/CreateRating")
 def post_rating(rating: Rating):
+    print("Received rating:", rating)
     if not (0 <= rating.rating and rating.rating <= 5):
         return JSONResponse(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, content={"error": f"Parameter 'rating is '{rating.rating}', which is not between 0 and 5"})
     if not user_exists(rating.userId) or not product_exists(rating.productId):
@@ -64,18 +67,22 @@ def post_rating(rating: Rating):
 @app.get("/GetRating")
 @app.get("/GetRating/{ratingId}")
 def get_rating_by_id(ratingId: Optional[str] = None):
+    print("Received ratingId:", ratingId)
     if not ratingId:
         return JSONResponse(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, content={"error": "Missing mandatory parameter 'ratingId'"})
     try:
         rating = rating_container.read_item(item=ratingId, partition_key=ratingId)
+        print("Retrieved rating:", rating)
         return JSONResponse(content=rating)
     except cosmos_exceptions.CosmosResourceNotFoundError:
+        print("Rating not found")
         return JSONResponse(status_code=status.HTTP_404_NOT_FOUND, content={"error": f"Rating not found for id '{ratingId}'"})
 
 
 @app.get("/GetRatings")
 @app.get("/GetRatings/{userId}")
 def get_ratings_by_user(userId: Optional[str] = None):
+    print("Received userId:", userId)
     if not userId:
         return JSONResponse(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, content={"error": "Missing mandatory parameter 'userId'"})
     if not user_exists(userId):
@@ -87,5 +94,6 @@ def get_ratings_by_user(userId: Optional[str] = None):
         ],
         enable_cross_partition_query=True
     ))
+    print("Retrieved ratings:", rating_list)
     return JSONResponse(content=rating_list)
 
