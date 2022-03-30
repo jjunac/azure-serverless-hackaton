@@ -43,22 +43,6 @@ jobs:
 
       - name: Install dependencies
         run: pip install -r requirements.txt --target=".python_packages/lib/site-packages"
-        
-      # Optional: Add step to run tests here (PyTest, Django test suites, etc.)
-      
-      - name: Upload artifact for deployment jobs
-        uses: actions/upload-artifact@v3
-        with:
-          name: python-app
-          path: |
-            . 
-            !venv/
-            
-            
-#       - name: 'Login via Azure CLI'
-#         uses: azure/login@v1
-#         with:
-#           creds: ${{ secrets.AZURE_RBAC_CREDENTIALS }}
 
       - name: 'Az CLI login'
         uses: azure/login@v1
@@ -66,12 +50,6 @@ jobs:
           client-id: "dc891217-e2e8-49f7-ac09-1158a9520ace"
           tenant-id: "83370987-42ca-46b6-88bd-671273dca361"
           subscription-id: "0b98d395-76e0-4bf0-a5fb-2529850f846c"
-  
-      - name: 'Run az commands'
-        run: |
-          az account show
-          az group list
-          pwd 
 
       - name: 'Run Azure Functions Action'
         uses: Azure/functions-action@v1
@@ -79,4 +57,3 @@ jobs:
         with:
           app-name: ${{ env.AZURE_FUNCTIONAPP_NAME }}
           package: ${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}
-#           publish-profile: ${{ secrets.AZURE_FUNCTIONAPP_PUBLISH_PROFILE }}
