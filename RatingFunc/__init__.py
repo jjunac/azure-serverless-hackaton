@@ -8,6 +8,12 @@ import azure.cosmos.cosmos_client as cosmos_client
 import azure.cosmos.exceptions as cosmos_exceptions
 from azure.core.credentials import AzureKeyCredential
 from azure.ai.textanalytics import TextAnalyticsClient
+from opencensus.ext.azure import metrics_exporter
+from opencensus.stats import aggregation as aggregation_module
+from opencensus.stats import measure as measure_module
+from opencensus.stats import stats as stats_module
+from opencensus.stats import view as view_module
+from opencensus.tags import tag_map as tag_map_module
 
 from azure.cosmos.partition_key import PartitionKey
 
@@ -15,18 +21,34 @@ from fastapi import FastAPI, status
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-
+# Database config
 DB_HOST = "https://openhackdb.documents.azure.com:443/"
 DB_MASTER_KEY = "GYslGRpMOdHh9eHfR412sV4Cr5UU3DgeL8jHQ9pLnYXUChGw3GBFCExnWwxTOW3SwqVgmLxyR243TjCfJTbSUQ=="
 DB_DATABASE_ID = "rating"
 DB_CONTAINER_ID = "ratingcontainer"
-
 db_client = cosmos_client.CosmosClient(DB_HOST, {'masterKey': DB_MASTER_KEY} )
 rating_container = db_client.create_database_if_not_exists(id=DB_DATABASE_ID).create_container_if_not_exists(id=DB_CONTAINER_ID, partition_key=PartitionKey(path='/id', kind='Hash'))
 
+# Monitoring config
+stats = stats_module.stats
+view_manager = stats.view_manager
+stats_recorder = stats.stats_recorder
+sentiment_kpi = measure_module.MeasureInt("sentimentScore",
+                                           "sentiment score",
+                                           "sentimentScores")
+sentiment_kpi_view = view_module.View("sentimentScore view",
+                               "sentiment score",
+                               [],
+                               sentiment_kpi,
+                               aggregation_module.CountAggregation())
+view_manager.register_view(sentiment_kpi_view)
+mmap = stats_recorder.new_measurement_map()
+# tmap = tag_map_module.TagMap()
+exporter = metrics_exporter.new_metrics_exporter()
+view_manager.register_exporter(exporter)
+
+# FastAPI config
 app = FastAPI()
-
-
 def main(req: func.HttpRequest, context: func.Context) -> func.HttpResponse:
     return func.AsgiMiddleware(app).handle(req, context)
 
@@ -52,7 +74,11 @@ def analyse_sentiment(text: str) -> float:
     response = text_analytics_client.analyze_sentiment([text], language="en")
     print("Sentiment analysis result:", response)
 
-    return response[0].confidence_scores.negative
+    score = response[0].confidence_scores.negative
+
+    mmap.measure_int_put(score, 1)
+    # mmap.record(tmap)
+    return score
 
 class Rating(BaseModel):
     userId: str

@@ -6,3 +6,5 @@ fastapi
 azure-cosmos==4.2.0
 requests
 azure-ai-textanalytics
+opencensus-extension-azure-functions
+opencensus-ext-requests
