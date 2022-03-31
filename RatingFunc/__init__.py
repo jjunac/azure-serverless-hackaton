@@ -6,6 +6,8 @@ from typing import Optional
 import azure.functions as func
 import azure.cosmos.cosmos_client as cosmos_client
 import azure.cosmos.exceptions as cosmos_exceptions
+from azure.core.credentials import AzureKeyCredential
+from azure.ai.textanalytics import TextAnalyticsClient
 
 from azure.cosmos.partition_key import PartitionKey
 
@@ -41,6 +43,17 @@ def product_exists(productId: str) -> bool:
     return res.status_code == 200
 
 
+def analyse_sentiment(text: str) -> float:
+    print("Analysing sentiment for:", text)
+    TEXT_ANALYSIS_KEY = AzureKeyCredential("8bb6802c43724d8a81d785358fb4ab78")
+    TEXT_ANALYSIS_ENDPOINT = "https://sentimentanalysisjj.cognitiveservices.azure.com/"
+    text_analytics_client = TextAnalyticsClient(TEXT_ANALYSIS_ENDPOINT, TEXT_ANALYSIS_KEY)
+
+    response = text_analytics_client.analyze_sentiment([text], language="en")
+    print("Sentiment analysis result:", response)
+
+    return response[0].confidence_scores.negative
+
 class Rating(BaseModel):
     userId: str
     productId: str
@@ -59,6 +72,7 @@ def post_rating(rating: Rating):
     inserted_rating = rating_container.create_item(body={
         "id": str(uuid.uuid4()),
         "timestamp": int(time.time()),
+        "sentimentScore": analyse_sentiment(rating.userNotes),
         **dict(rating)
     })
     return JSONResponse(content=inserted_rating)
