@@ -1,6 +1,7 @@
 import logging
 import time
 import uuid
+import os
 import requests
 from typing import Optional
 import azure.functions as func
@@ -8,12 +9,8 @@ import azure.cosmos.cosmos_client as cosmos_client
 import azure.cosmos.exceptions as cosmos_exceptions
 from azure.core.credentials import AzureKeyCredential
 from azure.ai.textanalytics import TextAnalyticsClient
-from opencensus.ext.azure import metrics_exporter
-from opencensus.stats import aggregation as aggregation_module
-from opencensus.stats import measure as measure_module
-from opencensus.stats import stats as stats_module
-from opencensus.stats import view as view_module
-from opencensus.tags import tag_map as tag_map_module
+from applicationinsights import TelemetryClient
+from applicationinsights.logging import enable as telemetry_enable
 
 from azure.cosmos.partition_key import PartitionKey
 
@@ -30,22 +27,8 @@ db_client = cosmos_client.CosmosClient(DB_HOST, {'masterKey': DB_MASTER_KEY} )
 rating_container = db_client.create_database_if_not_exists(id=DB_DATABASE_ID).create_container_if_not_exists(id=DB_CONTAINER_ID, partition_key=PartitionKey(path='/id', kind='Hash'))
 
 # Monitoring config
-stats = stats_module.stats
-view_manager = stats.view_manager
-stats_recorder = stats.stats_recorder
-sentiment_kpi = measure_module.MeasureInt("sentimentScore",
-                                           "sentiment score",
-                                           "sentimentScores")
-sentiment_kpi_view = view_module.View("sentimentScore view",
-                               "sentiment score",
-                               [],
-                               sentiment_kpi,
-                               aggregation_module.CountAggregation())
-view_manager.register_view(sentiment_kpi_view)
-mmap = stats_recorder.new_measurement_map()
-# tmap = tag_map_module.TagMap()
-exporter = metrics_exporter.new_metrics_exporter()
-view_manager.register_exporter(exporter)
+tc = TelemetryClient(os.environ["APPINSIGHTS_INSTRUMENTATIONKEY"])
+telemetry_enable(os.environ["APPINSIGHTS_INSTRUMENTATIONKEY"])
 
 # FastAPI config
 app = FastAPI()
@@ -76,7 +59,11 @@ def analyse_sentiment(text: str) -> float:
 
     score = response[0].confidence_scores.negative
 
-    mmap.measure_int_put(score, 1)
+    print(f"SENTIMENT_SCORE={score}")
+    tc.track_trace('SentimentScore', { 'score': score })
+    tc.flush()
+
+    # mmap.measure_int_put(score, 1)
     # mmap.record(tmap)
     return score
 
